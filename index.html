@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Football Team Setup</title>
+    <title>BIFC D9-Blue Team Setup</title>
     <style>
         * {
             margin: 0;
@@ -133,8 +133,8 @@
                     transparent 1px,
                     transparent 20px
                 );
-            height: 500px;
-            border: 3px solid white;
+            min-height: 500px;
+            /*border: 3px solid white;*/
             border-radius: 8px;
             position: relative;
             display: grid;
@@ -146,13 +146,19 @@
         .position-area {
             border: 2px dashed rgba(255,255,255,0.4);
             border-radius: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+            gap: 3px;
             min-height: 100px;
             position: relative;
             transition: all 0.3s ease;
             background: rgba(255,255,255,0.05);
+            padding: 5px;
+        }
+
+        /* Make goalkeeper area have only one column, so the slot stretches full width */
+        #goalkeeper {
+            grid-template-columns: 1fr !important;
         }
 
         .position-area:hover {
@@ -166,14 +172,38 @@
             transform: scale(1.02);
         }
 
+        .position-slot {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 60px;
+            border-radius: 8px;
+            border: 1px dashed rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .position-slot:hover {
+            border-color: rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .position-slot.drag-over {
+            background: rgba(52, 152, 219, 0.4);
+            border-color: #3498db;
+            border-style: solid;
+        }
+
         .position-label {
             position: absolute;
             top: 5px;
             left: 10px;
             color: white;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
         }
 
         .player-bubble {
@@ -208,7 +238,7 @@
         }
 
         .player-bubble.goalkeeper {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            background: linear-gradient(135deg, #e4e73c, #c0b42b);
         }
 
         .player-bubble.defender {
@@ -286,7 +316,7 @@
             }
             
             .pitch {
-                height: 400px;
+                height: 350px;
                 padding: 10px;
             }
             
@@ -315,7 +345,7 @@
             }
             
             .pitch {
-                height: 350px;
+                height: 300px;
             }
         }
 
@@ -341,19 +371,26 @@
             }
             
             .pitch {
-                height: 300px;
+                height: 250px;
                 padding: 8px;
             }
+            
+            .position-label {
+                font-size: 0.7rem;
+                padding: 1px 6px;
+            }
+
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>⚽ Team Formation Setup</h1>
+            <h1>⚽ BIFC D9-blue TeamSetup</h1>
             <div class="controls">
                 <button class="btn btn-primary" onclick="saveTeam()">💾 Save Formation</button>
                 <button class="btn btn-secondary" onclick="resetTeam()">🔄 Reset</button>
+                <button class="btn btn-secondary" onclick="clearAllData()">🗑️ Clear Data</button>
                 <button class="btn btn-secondary" onclick="exportTeam()">📤 Export</button>
             </div>
         </div>
@@ -405,24 +442,28 @@
     </div>
 
     <script>
-        // Sample data - you can replace this with database integration
+        // Your team players
         let players = [
-            { id: 1, name: "Alex Johnson", position: "goalkeeper" },
-            { id: 2, name: "Sam Wilson", position: "defender" },
-            { id: 3, name: "Jordan Smith", position: "defender" },
-            { id: 4, name: "Casey Brown", position: "defender" },
-            { id: 5, name: "Taylor Davis", position: "midfielder" },
-            { id: 6, name: "Morgan Garcia", position: "midfielder" },
-            { id: 7, name: "Riley Martinez", position: "midfielder" },
-            { id: 8, name: "Cameron Anderson", position: "attacker" },
-            { id: 9, name: "Avery Thomas", position: "attacker" },
-            { id: 10, name: "Quinn Jackson", position: "any" },
-            { id: 11, name: "Sage White", position: "any" },
-            { id: 12, name: "River Lopez", position: "any" },
-            { id: 13, name: "Phoenix Lee", position: "any" }
+            { id: 1, name: "Gui", position: "goalkeeper" },
+            { id: 2, name: "Glenn", position: "defender" },
+            { id: 3, name: "Tyson", position: "defender" },
+            { id: 4, name: "Ben", position: "any" },
+            { id: 14, name: "Fernando", position: "defender" },
+            { id: 5, name: "Filipo", position: "midfielder" },
+            { id: 6, name: "Tim", position: "midfielder" },
+            { id: 8, name: "Lucas", position: "attacker" },
+            { id: 9, name: "Jeremi", position: "attacker" },
+            { id: 11, name: "George", position: "any" },
+            { id: 12, name: "Freddie", position: "attacker" },
         ];
 
-        let currentFormation = { attack: [], midfield: [], defense: [], goalkeeper: [], bench: [] };
+        let currentFormation = { 
+            attack: [null, null, null, null, null], 
+            midfield: [null, null, null, null, null], 
+            defense: [null, null, null, null, null], 
+            goalkeeper: [null], 
+            bench: [] 
+        };
         let draggedPlayer = null;
 
         function initializeApp() {
@@ -436,13 +477,18 @@
             playerPool.innerHTML = '';
             
             // Show players not in formation or bench
-            const usedPlayerIds = new Set([
-                ...currentFormation.attack.map(p => p.id),
-                ...currentFormation.midfield.map(p => p.id),
-                ...currentFormation.defense.map(p => p.id),
-                ...currentFormation.goalkeeper.map(p => p.id),
-                ...currentFormation.bench.map(p => p.id)
-            ]);
+            const usedPlayerIds = new Set();
+            
+            // Collect used player IDs from all positions (including null slots)
+            Object.keys(currentFormation).forEach(position => {
+                if (Array.isArray(currentFormation[position])) {
+                    currentFormation[position].forEach(player => {
+                        if (player && player !== null && player.id) {
+                            usedPlayerIds.add(player.id);
+                        }
+                    });
+                }
+            });
 
             players.filter(p => !usedPlayerIds.has(p.id)).forEach(player => {
                 const bubble = createPlayerBubble(player);
@@ -459,23 +505,36 @@
             ['attack', 'midfield', 'defense', 'goalkeeper'].forEach(pos => {
                 const area = document.getElementById(pos);
                 area.innerHTML = `<div class="position-label">${getPositionIcon(pos)} ${pos.toUpperCase()}</div>`;
+                
+                // Create position slots
+                const maxSlots = pos === 'goalkeeper' ? 1 : 5;
+                for (let i = 0; i < maxSlots; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'position-slot';
+                    slot.dataset.position = pos;
+                    slot.dataset.slot = i;
+                    
+                    // Add player if exists in this slot
+                    if (currentFormation[pos] && currentFormation[pos][i] && currentFormation[pos][i] !== null) {
+                        const bubble = createPlayerBubble(currentFormation[pos][i]);
+                        slot.appendChild(bubble);
+                    }
+                    
+                    area.appendChild(slot);
+                }
             });
 
+            // Render bench players
             const bench = document.getElementById('bench');
             bench.innerHTML = '';
-
-            // Add players to their positions
-            Object.keys(currentFormation).forEach(position => {
-                const container = document.getElementById(position) || document.getElementById('bench');
-                currentFormation[position].forEach(player => {
-                    const bubble = createPlayerBubble(player);
-                    if (position === 'bench') {
+            if (currentFormation.bench) {
+                currentFormation.bench.forEach(player => {
+                    if (player && player !== null) {
+                        const bubble = createPlayerBubble(player);
                         bench.appendChild(bubble);
-                    } else {
-                        container.appendChild(bubble);
                     }
                 });
-            });
+            }
         }
 
         function createPlayerBubble(player) {
@@ -503,14 +562,42 @@
         }
 
         function setupDragAndDrop() {
-            // Setup drop zones
-            ['attack', 'midfield', 'defense', 'goalkeeper', 'bench', 'playerPool'].forEach(id => {
+            // Setup drop zones for position slots
+            document.addEventListener('dragover', handleDragOver);
+            document.addEventListener('drop', handleDropGlobal);
+            
+            // Setup drop zones for bench and player pool
+            ['bench', 'playerPool'].forEach(id => {
                 const element = document.getElementById(id);
                 element.addEventListener('dragover', handleDragOver);
                 element.addEventListener('drop', handleDrop);
                 element.addEventListener('dragenter', handleDragEnter);
                 element.addEventListener('dragleave', handleDragLeave);
             });
+        }
+
+        function handleDropGlobal(e) {
+            e.preventDefault();
+            
+            // Check if dropped on a position slot
+            const slot = e.target.closest('.position-slot');
+            if (slot && draggedPlayer) {
+                const position = slot.dataset.position;
+                const slotIndex = parseInt(slot.dataset.slot);
+                
+                if (canPlacePlayerInSlot(draggedPlayer, position, slotIndex)) {
+                    // Remove player from current position
+                    removePlayerFromFormation(draggedPlayer.id);
+                    
+                    // Add to specific slot
+                    currentFormation[position][slotIndex] = players.find(p => p.id === draggedPlayer.id);
+                    
+                    renderPlayers();
+                }
+            }
+            
+            // Clean up drag state
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         }
 
         function handleDragStart(e) {
@@ -536,13 +623,19 @@
 
         function handleDragEnter(e) {
             e.preventDefault();
-            if (e.target.classList.contains('position-area') || e.target.id === 'bench' || e.target.id === 'playerPool') {
+            const slot = e.target.closest('.position-slot');
+            if (slot) {
+                slot.classList.add('drag-over');
+            } else if (e.target.classList.contains('position-area') || e.target.id === 'bench' || e.target.id === 'playerPool') {
                 e.target.classList.add('drag-over');
             }
         }
 
         function handleDragLeave(e) {
-            if (!e.currentTarget.contains(e.relatedTarget)) {
+            const slot = e.target.closest('.position-slot');
+            if (slot && !slot.contains(e.relatedTarget)) {
+                slot.classList.remove('drag-over');
+            } else if (!e.currentTarget.contains(e.relatedTarget)) {
                 e.currentTarget.classList.remove('drag-over');
             }
         }
@@ -553,48 +646,35 @@
             
             if (!draggedPlayer) return;
 
-            const targetPosition = e.currentTarget.dataset.position || e.currentTarget.id;
+            const targetPosition = e.currentTarget.id;
             const player = players.find(p => p.id === draggedPlayer.id);
             
             if (!player) return;
 
-            // Validation rules
-            if (!canPlacePlayer(player, targetPosition)) {
-                return;
-            }
-
-            // Remove player from current position
-            removePlayerFromFormation(draggedPlayer.id);
-
-            // Add to new position
+            // Handle drops on bench and player pool only
             if (targetPosition === 'playerPool') {
-                // Do nothing - player goes back to pool
+                // Remove player from current position and return to pool
+                removePlayerFromFormation(draggedPlayer.id);
             } else if (targetPosition === 'bench') {
                 if (currentFormation.bench.length < 4) {
+                    removePlayerFromFormation(draggedPlayer.id);
                     currentFormation.bench.push(player);
+                } else {
+                    alert('Bench is full! Maximum 4 players on bench.');
+                    return;
                 }
-            } else {
-                if (!currentFormation[targetPosition]) currentFormation[targetPosition] = [];
-                currentFormation[targetPosition].push(player);
             }
 
             renderPlayers();
         }
 
-        function canPlacePlayer(player, targetPosition) {
-            // Bench validation
-            if (targetPosition === 'bench' && currentFormation.bench.length >= 4) {
-                alert('Bench is full! Maximum 4 players on bench.');
-                return false;
-            }
+        function canPlacePlayerInSlot(draggedPlayer, targetPosition, slotIndex) {
+            const player = players.find(p => p.id === draggedPlayer.id);
+            if (!player) return false;
 
-            // Position limits for 9v9
-            const limits = { goalkeeper: 1, defense: 4, midfield: 4, attack: 4 };
-            
-            if (limits[targetPosition] && currentFormation[targetPosition] && 
-                currentFormation[targetPosition].length >= limits[targetPosition]) {
-                alert(`Maximum ${limits[targetPosition]} players in ${targetPosition}`);
-                return false;
+            // Check if slot is already occupied
+            if (currentFormation[targetPosition][slotIndex] !== null && currentFormation[targetPosition][slotIndex] !== undefined) {
+                return confirm(`Replace ${currentFormation[targetPosition][slotIndex].name} with ${player.name}?`);
             }
 
             // Goalkeeper position validation
@@ -607,14 +687,26 @@
 
         function removePlayerFromFormation(playerId) {
             Object.keys(currentFormation).forEach(position => {
-                currentFormation[position] = currentFormation[position].filter(p => p.id !== playerId);
+                if (Array.isArray(currentFormation[position])) {
+                    for (let i = 0; i < currentFormation[position].length; i++) {
+                        if (currentFormation[position][i] && currentFormation[position][i].id === playerId) {
+                            if (position === 'bench') {
+                                currentFormation[position].splice(i, 1);
+                            } else {
+                                currentFormation[position][i] = null;
+                            }
+                            break;
+                        }
+                    }
+                }
             });
         }
 
         function findPlayerPosition(playerId) {
             for (let position of Object.keys(currentFormation)) {
-                if (currentFormation[position].find(p => p.id === playerId)) {
-                    return position;
+                if (Array.isArray(currentFormation[position])) {
+                    const found = currentFormation[position].find(p => p && p !== null && p.id === playerId);
+                    if (found) return position;
                 }
             }
             return 'playerPool';
@@ -622,10 +714,10 @@
 
         function updateFormationDisplay() {
             const counts = {
-                defense: currentFormation.defense.length,
-                midfield: currentFormation.midfield.length,
-                attack: currentFormation.attack.length,
-                goalkeeper: currentFormation.goalkeeper.length
+                defense: currentFormation.defense ? currentFormation.defense.filter(p => p !== null && p !== undefined).length : 0,
+                midfield: currentFormation.midfield ? currentFormation.midfield.filter(p => p !== null && p !== undefined).length : 0,
+                attack: currentFormation.attack ? currentFormation.attack.filter(p => p !== null && p !== undefined).length : 0,
+                goalkeeper: currentFormation.goalkeeper ? currentFormation.goalkeeper.filter(p => p !== null && p !== undefined).length : 0
             };
             
             const formation = `${counts.defense}-${counts.midfield}-${counts.attack}${counts.goalkeeper ? '-' + counts.goalkeeper : ''}`;
@@ -671,10 +763,57 @@
 
         function resetTeam() {
             if (confirm('Reset all positions? This will move all players back to the pool.')) {
-                currentFormation = { attack: [], midfield: [], defense: [], goalkeeper: [], bench: [] };
+                currentFormation = { 
+                    attack: [null, null, null, null, null], 
+                    midfield: [null, null, null, null, null], 
+                    defense: [null, null, null, null, null], 
+                    goalkeeper: [null], 
+                    bench: [] 
+                };
                 renderPlayers();
             }
         }
+
+        function clearAllData() {
+            if (confirm('Clear all saved data and reset to default team? This cannot be undone.')) {
+                // Clear localStorage
+                localStorage.removeItem('footballTeam');
+                
+                // Reset to default formation
+                currentFormation = { 
+                    attack: [null, null, null, null, null], 
+                    midfield: [null, null, null, null, null], 
+                    defense: [null, null, null, null, null], 
+                    goalkeeper: [null], 
+                    bench: [] 
+                };
+                
+                // Reset to your original team players
+                players = [
+                    { id: 1, name: "Gui", position: "goalkeeper" },
+                    { id: 2, name: "Glenn", position: "defender" },
+                    { id: 3, name: "Tyson", position: "defender" },
+                    { id: 4, name: "Ben", position: "any" },
+                    { id: 14, name: "Fernando", position: "defender" },
+                    { id: 5, name: "Filipo", position: "midfielder" },
+                    { id: 6, name: "Tim", position: "midfielder" },
+                    { id: 8, name: "Lucas", position: "attacker" },
+                    { id: 9, name: "Jeremi", position: "attacker" },
+                    { id: 11, name: "George", position: "any" },
+                    { id: 12, name: "Freddie", position: "attacker" },
+                ];
+                
+                renderPlayers();
+                alert('All data cleared! Starting fresh with your team.');
+            }
+        }
+
+        // Handle Enter key in player name input
+        document.getElementById('playerName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addPlayer();
+            }
+        });
 
         function exportTeam() {
             const data = {
@@ -693,13 +832,6 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-
-        // Handle Enter key in player name input
-        document.getElementById('playerName').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                addPlayer();
-            }
-        });
 
         // Initialize the application
         initializeApp();
