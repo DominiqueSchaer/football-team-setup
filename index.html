@@ -89,6 +89,9 @@
             padding: 15px;
             border: 2px solid #e9ecef;
             min-width: 260px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
 
         .sidebar h3 {
@@ -97,7 +100,8 @@
             font-size: 1.1rem;
         }
 
-        .player-pool, .bench {
+        .bench {
+            flex: 1;
             min-height: 120px;
             border: 2px dashed #bdc3c7;
             border-radius: 8px;
@@ -397,14 +401,13 @@
 
         <div class="main-content">
             <div class="sidebar">
-                <h3>👥 Available Players</h3>
-                <div class="player-pool" id="playerPool">
-                    <!-- Players will be added here -->
-                </div>
-
                 <h3>🪑 Bench (Max 4)</h3>
                 <div class="bench" id="bench">
                     <!-- Bench players here -->
+                </div>
+
+                <div id="garbageBin" class="garbage-bin" style="text-align:center; margin-bottom:15px; padding:10px; border:2px dashed #e74c3c; border-radius:8px; background:#fff;">
+                    🗑️ <span style="color:#e74c3c; font-weight:bold;">Drag here to delete player</span>
                 </div>
 
                 <div class="add-player-form">
@@ -455,6 +458,7 @@
             { id: 9, name: "Jeremi", position: "attacker" },
             { id: 11, name: "George", position: "any" },
             { id: 12, name: "Freddie", position: "attacker" },
+            { id: 13, name: "Daniil", position: "any" },
         ];
 
         let currentFormation = { 
@@ -462,7 +466,7 @@
             midfield: [null, null, null, null, null], 
             defense: [null, null, null, null, null], 
             goalkeeper: [null], 
-            bench: [] 
+            bench: [...players]
         };
         let draggedPlayer = null;
 
@@ -473,8 +477,8 @@
         }
 
         function renderPlayers() {
-            const playerPool = document.getElementById('playerPool');
-            playerPool.innerHTML = '';
+            const bench = document.getElementById('bench');
+            bench.innerHTML = '';
             
             // Show players not in formation or bench
             const usedPlayerIds = new Set();
@@ -492,7 +496,7 @@
 
             players.filter(p => !usedPlayerIds.has(p.id)).forEach(player => {
                 const bubble = createPlayerBubble(player);
-                playerPool.appendChild(bubble);
+                bench.appendChild(bubble);
             });
 
             // Render positioned players
@@ -562,18 +566,40 @@
         }
 
         function setupDragAndDrop() {
-            // Setup drop zones for position slots
             document.addEventListener('dragover', handleDragOver);
             document.addEventListener('drop', handleDropGlobal);
-            
-            // Setup drop zones for bench and player pool
-            ['bench', 'playerPool'].forEach(id => {
-                const element = document.getElementById(id);
-                element.addEventListener('dragover', handleDragOver);
-                element.addEventListener('drop', handleDrop);
-                element.addEventListener('dragenter', handleDragEnter);
-                element.addEventListener('dragleave', handleDragLeave);
+
+            // Only add listeners to bench (playerPool does not exist)
+            const benchElement = document.getElementById('bench');
+            benchElement.addEventListener('dragover', handleDragOver);
+            benchElement.addEventListener('drop', handleDrop);
+            benchElement.addEventListener('dragenter', handleDragEnter);
+            benchElement.addEventListener('dragleave', handleDragLeave);
+
+            // Garbage bin setup
+            const garbageBin = document.getElementById('garbageBin');
+            garbageBin.addEventListener('dragover', handleDragOver);
+            garbageBin.addEventListener('drop', handleGarbageDrop);
+            garbageBin.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+                garbageBin.classList.add('drag-over');
             });
+            garbageBin.addEventListener('dragleave', function(e) {
+                garbageBin.classList.remove('drag-over');
+            });
+        }
+
+        function handleGarbageDrop(e) {
+            e.preventDefault();
+            const garbageBin = document.getElementById('garbageBin');
+            garbageBin.classList.remove('drag-over');
+            if (!draggedPlayer) return;
+
+            // Remove player from formation and from players array
+            removePlayerFromFormation(draggedPlayer.id);
+            players = players.filter(p => p.id !== draggedPlayer.id);
+
+            renderPlayers();
         }
 
         function handleDropGlobal(e) {
@@ -584,14 +610,24 @@
             if (slot && draggedPlayer) {
                 const position = slot.dataset.position;
                 const slotIndex = parseInt(slot.dataset.slot);
-                
+
+                // If slot is occupied, move replaced player to bench
+                const replacedPlayer = currentFormation[position][slotIndex];
                 if (canPlacePlayerInSlot(draggedPlayer, position, slotIndex)) {
-                    // Remove player from current position
+                    // Remove dragged player from current position
                     removePlayerFromFormation(draggedPlayer.id);
-                    
-                    // Add to specific slot
+
+                    // Add dragged player to slot
                     currentFormation[position][slotIndex] = players.find(p => p.id === draggedPlayer.id);
-                    
+
+                    // If replaced player exists, push to bench (if not already there)
+                    if (replacedPlayer && replacedPlayer.id) {
+                        // Prevent duplicates
+                        if (!currentFormation.bench.some(p => p.id === replacedPlayer.id)) {
+                            currentFormation.bench.push(replacedPlayer);
+                        }
+                    }
+
                     renderPlayers();
                 }
             }
@@ -656,11 +692,11 @@
                 // Remove player from current position and return to pool
                 removePlayerFromFormation(draggedPlayer.id);
             } else if (targetPosition === 'bench') {
-                if (currentFormation.bench.length < 4) {
+                if (currentFormation.bench.length < 13) {
                     removePlayerFromFormation(draggedPlayer.id);
                     currentFormation.bench.push(player);
                 } else {
-                    alert('Bench is full! Maximum 4 players on bench.');
+                    alert('Bench is full! Maximum 13 players on bench.');
                     return;
                 }
             }
@@ -709,7 +745,7 @@
                     if (found) return position;
                 }
             }
-            return 'playerPool';
+            return 'bench';
         }
 
         function updateFormationDisplay() {
@@ -736,7 +772,10 @@
             const newId = Math.max(...players.map(p => p.id)) + 1;
             const newPlayer = { id: newId, name: name, position: position };
             players.push(newPlayer);
-            
+
+            // Add new player to the bench
+            currentFormation.bench.push(newPlayer);
+
             document.getElementById('playerName').value = '';
             document.getElementById('playerPosition').value = 'any';
             
@@ -768,7 +807,7 @@
                     midfield: [null, null, null, null, null], 
                     defense: [null, null, null, null, null], 
                     goalkeeper: [null], 
-                    bench: [] 
+                    bench: [...players]
                 };
                 renderPlayers();
             }
@@ -801,6 +840,7 @@
                     { id: 9, name: "Jeremi", position: "attacker" },
                     { id: 11, name: "George", position: "any" },
                     { id: 12, name: "Freddie", position: "attacker" },
+                    { id: 13, name: "Daniil", position: "any" },
                 ];
                 
                 renderPlayers();
